@@ -1,0 +1,268 @@
+import numpy as np
+import pandas as pd
+
+from tensorflow.keras import layers
+from tensorflow.keras import models
+from tensorflow.keras.utils import to_categorical
+from sklearn.model_selection import train_test_split
+from tensorflow.keras.callbacks import EarlyStopping
+from keras.optimizers import RMSprop
+
+data=pd.read_csv('/kaggle/input/sign-language-mnist/sign_mnist_train/sign_mnist_train.csv')
+#shape of the data 
+data.shape
+data.head()
+
+sorted(data.label.unique())
+
+def adjust_class_labels(label):
+   
+    if label >= 10:
+        label -= 1
+    
+    return label
+
+# Adjusting the class labels (training data)
+data["label"] = data["label"].apply(adjust_class_labels)
+np.unique(data["label"].values)
+data.isnull().sum()
+import matplotlib.image as mpimg
+import matplotlib.pyplot as plt 
+import random
+images=data.drop('label',axis=1).values
+plt.figure(figsize=(16,16))
+for i in range(7): 
+    img=images[i].reshape(28,28)
+    fig = plt.subplot(4,4,i+1)
+     
+    plt.imshow(img, cmap='gray')
+
+#convertir data to array
+
+x=data.drop('label',axis=1).values
+y=data.label.values
+
+#splitting the data using 80% of data as training data 
+X_train, X_val, y_train, y_val = train_test_split(x, y, test_size=0.2,shuffle=True, random_state=2)
+
+
+#reshape the data to fit in the model as size of input 28*28**
+
+X_train = X_train.reshape(-1,28,28,1)
+X_val = X_val.reshape(-1,28,28,1)
+
+#scaling 
+X_train=X_train/255.0
+X_val=X_val/255.0
+
+
+#convert the lables to categorical data using one-hot encoding
+y_train=to_categorical(y_train , num_classes=24)  
+y_val=to_categorical(y_val , num_classes=24)  
+
+X_val.shape
+
+model = models.Sequential()
+model.add(layers.Conv2D(32, (3, 3), activation='relu', input_shape=(28, 28,1)))
+model.add(layers.MaxPooling2D((2, 2)))
+model.add(layers.Conv2D(64, (3, 3), activation='relu'))
+model.add(layers.MaxPooling2D((2, 2)))
+model.add(layers.Flatten())
+model.add(layers.Dense(1024, activation='relu'))
+model.add(layers.Dropout(0.5))
+model.add(layers.Dense(24, activation='softmax'))
+model.summary()
+
+#compile the model 
+        #choice of optimizer RMSProp
+    
+model.compile(optimizer=RMSprop(lr=0.001, rho=0.9, epsilon=1e-08, decay=0.0),
+              loss='categorical_crossentropy',
+              metrics=['accuracy'])
+
+
+batch_size=100
+epochs=10
+
+# Train your model using augmented data/
+history=model.fit(X_train,y_train, steps_per_epoch=X_train.shape[0] // batch_size, 
+                            epochs=epochs,validation_data=(X_val, y_val),verbose=2)
+
+test=pd.read_csv('/kaggle/input/sign-language-mnist/sign_mnist_test/sign_mnist_test.csv')
+test["label"] = test["label"].apply(adjust_class_labels)
+y_test=test['label']
+
+test=test.drop('label',axis=1)
+test=test.values.reshape((-1,28, 28,1))
+
+test=test/255
+y_test=to_categorical(y_test)
+
+
+
+test_loss, test_acc = model.evaluate(test,y_test, steps=50)
+acc = history.history['accuracy']
+val_acc = history.history['val_accuracy']
+loss = history.history['loss']
+val_loss = history.history['val_loss']
+epochs = range(len(acc))
+
+plt.plot(epochs, acc, 'bo', label='Training acc')
+plt.plot(epochs, val_acc, 'b', label='Validation acc')
+plt.title('Training and validation accuracy')
+plt.legend()
+
+plt.figure()
+
+plt.plot(epochs, loss, 'bo', label='Training loss')
+plt.plot(epochs, val_loss, 'b', label='Validation loss')
+plt.title('Training and validation loss')
+plt.legend()
+
+plt.show()
+import joblib
+joblib.dump(model, 'model_try1.pkl')
+#saving the mdoel
+model.save('try_model.h5')
+
+test=pd.read_csv('/kaggle/input/sign-language-mnist/sign_mnist_test/sign_mnist_test.csv')
+test["label"] = test["label"].apply(adjust_class_labels)
+
+test=test.drop('label',axis=1)
+test=test.values.reshape((-1,28, 28,1))
+test=test/255
+
+submission=[]
+for i in range(len(test[:2000])):
+    x_img=test[i]
+    x_img = x_img.reshape((1,) + x_img.shape)
+    print(i)
+    predictions=model.predict(x_img)
+    class_index = np.argmax(predictions)
+    submission.append({'ImageId':i ,'Label':class_index})
+
+#saving the mdoel
+joblib.dump(model, 'model_try4.pkl')
+
+acc = history.history['accuracy']
+val_acc = history.history['val_accuracy']
+loss = history.history['loss']
+val_loss = history.history['val_loss']
+epochs = range(len(acc))
+
+plt.plot(epochs, acc, 'bo', label='Training acc')
+plt.plot(epochs, val_acc, 'b', label='Validation acc')
+plt.title('Training and validation accuracy')
+plt.legend()
+
+plt.figure()
+
+plt.plot(epochs, loss, 'bo', label='Training loss')
+plt.plot(epochs, val_loss, 'b', label='Validation loss')
+plt.title('Training and validation loss')
+plt.legend()
+
+plt.show()
+
+test=pd.read_csv('/kaggle/input/sign-language-mnist/sign_mnist_test/sign_mnist_test.csv')
+sub=pd.DataFrame(sub)
+predicted=sub.Label.values
+accuracy = accuracy_score(y_test[:5000], predicted)
+print("Accuracy: {:.2f}%".format(accuracy * 100))
+
+from tensorflow.keras.applications import MobileNetV2
+
+base_model = MobileNetV2(weights='imagenet', include_top=False, input_shape=(224, 224, 3))
+
+from tensorflow.keras import models
+from tensorflow.keras import layers 
+model=models.Sequential()
+model.add(base_model)
+model.add(layers.Flatten())
+model.add(layers.Dense(256, activation='relu'))
+model.add(layers.Dense(24, activation='softmax'))
+
+base_model.trainable = False
+model.summary()
+
+import cv2
+import numpy as np
+
+# Assuming X_train is a 3D array with shape (num_samples, 28, 28)
+image_width = 28
+image_height = 28
+target_width = 224
+target_height = 224
+
+# Ensure images are 8-bit grayscale
+grayscale_images = [np.uint8(image) for image in X_train]
+
+# Resize the images to 224x224 using OpenCV
+resized_images = [cv2.resize(image, (target_width, target_height)) for image in grayscale_images]
+
+# Convert grayscale images to RGB format
+rgb_images = np.array([cv2.cvtColor(image, cv2.COLOR_GRAY2RGB) for image in resized_images])
+
+# Ensure images are 8-bit grayscale
+grayscale_images = [np.uint8(image) for image in X_val]
+# Resize the images to 224x224 using OpenCV
+resized_images = [cv2.resize(image, (target_width, target_height)) for image in grayscale_images]
+
+# Convert grayscale images to RGB format
+rgb_val = np.array([cv2.cvtColor(image, cv2.COLOR_GRAY2RGB) for image in resized_images])
+
+from tensorflow.keras.applications.mobilenet import preprocess_input
+from keras.optimizers import RMSprop
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+
+batch_size = 20
+epochs = 30
+
+# Define ImageDataGenerator instances for data augmentation
+train_datagen = ImageDataGenerator(
+      rotation_range=40, 
+      width_shift_range=0.2,
+      height_shift_range=0.2,
+      shear_range=0.2,
+      zoom_range=0.2,
+      horizontal_flip=True,
+      fill_mode='nearest')
+
+
+# Create data generators for training and validation data
+train_generator = train_datagen.flow( rgb_images, y_train, batch_size=batch_size)
+
+# Compile the model
+model.compile(optimizer='Adam',
+              loss='categorical_crossentropy',
+              metrics=['accuracy'])
+
+# Train the model using data generators
+history = model.fit(
+    train_generator,
+    steps_per_epoch=len(train_generator),
+    epochs=epochs,
+    validation_data=(rgb_val,y_val),validation_steps=50,
+    verbose=2)
+
+base_model = MobileNetV2(weights='imagenet', include_top=False, input_shape=(224, 224, 3))
+
+
+
+model=models.Sequential()
+model.add(base_model)
+model.add(layers.Flatten())
+model.add(layers.Dense(128, activation='relu'))
+model.add(layers.Dense(24, activation='softmax'))
+
+base_model.trainable = True
+
+set_trainable = False
+for layer in base_model.layers:
+    if layer.name == 'block_16_expand':
+        set_trainable = True
+    if set_trainable:
+        layer.trainable = True
+    else:
+        layer.trainable = False
+        
